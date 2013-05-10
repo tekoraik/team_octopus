@@ -1,0 +1,121 @@
+var Namespace = Namespace || {};
+Namespace.model = Namespace.model || {};
+
+( function ( win, doc, util, undefined ) {
+	/**
+	 * Class Elevator
+	 * @param {String} sName         elevator name
+	 * @param {Number} nFloors       total floors in the building	
+	 * @param {Number} nInitialFloor
+	 * @author Regino Ballester
+	 */
+	Namespace.model.Elevator = function( sName, nFloors, nInitialFloor ) {
+		this.sName = sName || "A";
+		this.nMaxWeight = 500;
+		this.nCurrentWeight = 0;
+		this.aPendingStops = [];
+		this.bFinished = true;
+		this.nCurrentFloor = nInitialFloor || 0;
+		this.sDirection = "up";
+		this.oFloorInBuilding = new util.IteratorFloor( this.nCurrentFloor, nFloors );
+		this.oCurrentPersonInsideElevator = {};
+		this.oInformation = {
+			nTotalTraveledFloors : 0,
+			nCurrentPeople : 0,
+			nTotalPeopleTransported : 0
+		};
+	}
+
+	/**
+	 * Include a stop elevator in a floor
+	 * @author Regino Ballester, Rafael Yepes
+	 * @param {Object} oStop Object that contains properties floor with respective stop
+	 */
+	Namespace.model.Elevator.prototype.addStops = function ( nFloor ) {	
+		this.aPendingStops.push( nFloor );
+		if ( this.bFinished ) { 
+			this.bFinished = false;
+			this.sDirection = this.calculateDirection( nFloor );
+		}
+	}
+
+	/**
+	 * Return what is elevator direction 
+	 * @author Regino Ballester
+	 * @param  {Number} nDestinationFloor
+	 * @return {String}
+	 */
+	Namespace.model.Elevator.prototype.calculateDirection = function ( nDestinationFloor ) {
+		return ( nDestinationFloor >= this.nCurrentFloor ) ? "up" : "down";
+	}
+
+	/**
+	 * Returns if there are any pending stop
+	 * @return {Boolean} 
+	 * @author Regino Ballester
+	 */
+	Namespace.model.Elevator.prototype.hasPendingStops = function () {
+		return this.aPendingStops.length > 0;
+	}
+
+	/**
+	 * Deletes current floor from pending stops
+	 * @author Regino Ballester
+	 */
+	Namespace.model.Elevator.prototype.deleteCurrentFloorFromPendingStops = function () {
+		var nIndex = this.aPendingStops.indexOf( this.nCurrentFloor );
+
+		this.aPendingStops.splice( nIndex, 1 );
+	}
+
+	/**
+	 * Moves to the next floor in the current direction that elevator is
+	 * moving with the iterator
+	 * @author Regino Ballester, Rafael Yepes
+	 */
+	Namespace.model.Elevator.prototype.moveToNextFloor = function () {
+		this.nCurrentFloor = ( this.sDirection === "up" ) ? 
+			this.oFloorInBuilding.getNextFloor() : this.oFloorInBuilding.getPreviousFloor();
+		this.oInformation.nTotalTraveledFloors++;
+	}
+
+	/**
+	 * Checks if the person can enter to elevator and adds to people going to the same destination
+	 * @param  {Object} oGuest
+	 * @author Regino Ballester, Rafael Yepes      
+	 */
+	Namespace.model.Elevator.prototype.addPerson = function ( oGuest ) {
+		var _nDestinationFloor = oGuest.nDestinationFloor;
+
+		if ( ( this.nCurrentWeight + oGuest.nWeight ) > this.nMaxWeight ) {		
+			return oGuest;
+		} else {
+			this.nCurrentWeight += oGuest.nWeight; 
+			this.oCurrentPersonInsideElevator[_nDestinationFloor] = 
+				this.oCurrentPersonInsideElevator[_nDestinationFloor] || [];
+			this.oCurrentPersonInsideElevator[_nDestinationFloor].push( oGuest );
+			this.oInformation.nCurrentPeople++;
+			this.oInformation.nTotalPeopleTransported++;
+		}
+	}
+
+	/**
+	 * If people arrive at their destination exits of elevator and this update its weight
+	 * @author Regino Ballester
+	 */
+	Namespace.model.Elevator.prototype.peopleExitsElevator = function () {
+		var _nDestination = this.nCurrentFloor,
+			_aPeople = this.oCurrentPersonInsideElevator[_nDestination],
+			_nSizePeople = _aPeople.length,
+			_oPerson,
+			i = 0;
+
+		for ( ; i < _nSizePeople; i++ ) {
+			_oPerson = _aPeople[i];
+			this.nCurrentWeight -= _oPerson.nWeight;
+			this.oInformation.nCurrentPeople--;
+		}
+
+		delete this.oCurrentPersonInsideElevator[_nDestination];
+	}
+} ( window, document, Namespace.utilities ) );
